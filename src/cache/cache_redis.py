@@ -40,11 +40,6 @@ async def get_key_by_key_pattern(cache: BaseCacheBackend,
     return await client.keys(pattern=pattern)
 
 
-# async def redis_flush_current_db(cache: BaseCacheBackend) -> None:
-#     client = await cache._client
-#     return await client.flushdb()
-
-
 async def ping(cache: BaseCacheBackend) -> float | str:
     test_key, test_value = "testkey", "testvalue"
     await cache.set(key=test_key, value=test_value, expire=5)

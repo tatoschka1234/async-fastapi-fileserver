@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import timedelta
 from src.core.config import app_settings

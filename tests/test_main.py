@@ -46,22 +46,25 @@ async def test_register(client: AsyncClient,
 
 async def test_auth(client: AsyncClient,
                           async_session: AsyncSession) -> None:
-    response = await client.post(app.url_path_for("user_auth"),
-                                 data={
-                                     'username': test_user1,
-                                     'password': test_user1_psw,
-                                 }
-                                 )
+    response = await client.post(
+        app.url_path_for("user_auth"),
+        data={
+            'username': test_user1,
+            'password': test_user1_psw,
+        }
+    )
     assert response.status_code == HTTPStatus.OK
     assert "access_token" in response.json()
 
 
 async def test_get_file_empty_list(client_authorized: AsyncClient,
-
                           async_session: AsyncSession) -> None:
     response = await client_authorized.get(app.url_path_for("get_files"))
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == []
+    res = response.json()
+    assert 'files' in res
+    assert 'account_id' in res
+    assert res['files'] == []
 
 
 async def test_upload_file(client_authorized: AsyncClient,
@@ -69,12 +72,13 @@ async def test_upload_file(client_authorized: AsyncClient,
     path_folder = Path(test_downloads_folder_name).resolve()
     path_file = Path(test_file_name)
     file = {'file': path_file.open('rb')}
-    response = await client_authorized.post(app.url_path_for("upload_file"),
-                                            params={
-                                                'path': str(path_folder) + '/',
-                                            },
-                                            files=file,
-                                            )
+    response = await client_authorized.post(
+        app.url_path_for("upload_file"),
+        params={
+            'path': str(path_folder) + '/',
+        },
+        files=file,
+    )
     assert response.status_code == HTTPStatus.OK
 
 
@@ -82,19 +86,23 @@ async def test_get_file_list(client_authorized: AsyncClient,
                           async_session: AsyncSession) -> None:
     response = await client_authorized.get(app.url_path_for("get_files"))
     assert response.status_code == HTTPStatus.OK
-    assert len(response.json()) == 1
-    res = response.json()[0]
-    assert res['name'] == test_file_name
+    res = response.json()
+    assert 'files' in res
+    assert 'account_id' in res
+    assert len(res['files']) == 1
+    test_file_info = res['files'][0]
+    assert test_file_info['name'] == test_file_name
 
 
 async def test_download_file_by_path(client_authorized: AsyncClient,
                           async_session: AsyncSession) -> None:
     path = Path(test_downloads_folder_name, test_file_name).resolve()
-    response = await client_authorized.get(app.url_path_for("get_file"),
-                                           params={
-                                               'file_id': str(path)
-                                           },
-                                           )
+    response = await client_authorized.get(
+        app.url_path_for("get_file"),
+        params={
+            'file_id': str(path)
+        },
+    )
     assert response.status_code == HTTPStatus.OK
     content = None
     with open(test_file_name) as f:

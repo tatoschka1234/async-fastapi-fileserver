@@ -1,11 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, \
-    Response, Query, File, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import (APIRouter, Depends, HTTPException, status, Query, File,
+                     UploadFile)
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi.security import OAuth2PasswordBearer
-from typing import Optional
-from pathlib import Path
-import uuid
 from pathlib import Path
 from fastapi_cache.backends.redis import RedisCacheBackend
 
@@ -33,7 +28,7 @@ async def upload_file(
     user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),
     file: UploadFile = File(),
-    path: str # todo /src/user_files/
+    path: str = Query(example='/src/user_files/')
 ) -> None:
     """
     File upload.
@@ -77,13 +72,13 @@ async def get_file(
     return result
 
 
-@router.get("/list")#, response_model=files_schema.FilesList) #todo
+@router.get("/list", response_model=files_schema.FilesList)
 async def get_files(
         *,
         cache: RedisCacheBackend = Depends(redis_cache),
         user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(get_session),
-) -> files_schema.FilesList | list:
+) -> files_schema.FilesList:
     """
     Get files list.
     """
@@ -96,18 +91,22 @@ async def get_files(
             'account_id': user.id,
             'files': files_lst
         })
+        return files_schema.FilesList(account_id=user.id, files=files_lst)
     return result
 
 
-@router.get("/search")
+@router.get("/search",
+            response_model=files_schema.FileSearchResult)
 async def files_search(
         *,
         cache: RedisCacheBackend = Depends(redis_cache),
         user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(get_session),
-        path: str | None = None,
-        extension: str | None = None,
-        orderBy: str = Query(default="name", description=f"{list(files_schema.FileBase.__fields__.keys())}"),
+        path: str = '',
+        extension: str = '',
+        orderBy: str = Query(
+            default="name",
+            description=f"{', '.join(list(files_schema.FileBase.__fields__.keys()))}"),
         limit: int = 0
 ) -> files_schema.FileSearchResult:
     """
@@ -118,12 +117,8 @@ async def files_search(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"orderBy should be in {files_schema.FileBase.__fields__}"
         )
-
-    key_part = ''
-    for attr in [path, extension, orderBy, limit]:
-        if attr:
-            key_part = attr + '-'
-    cache_key = f'search-{user.id}-{key_part}'
+    cache_key = (f'search-user:{user.id}-path:{path}-ext:{extension}-'
+                 f'ord:{orderBy}-limit:{limit}')
     result = await get_cache(cache, cache_key)
     if not result:
         result = await files_crud.search(db=db, user=user, path=path,

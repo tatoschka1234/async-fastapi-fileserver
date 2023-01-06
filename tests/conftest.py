@@ -8,18 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from http import HTTPStatus
 from fastapi_cache import caches, close_caches
-from fastapi_cache.backends.redis import CACHE_KEY, RedisCacheBackend
+from fastapi_cache.backends.redis import RedisCacheBackend
 from src.cache.cache_redis import redis_cache
 from src.main import app
 from src.db.db import Base
 from src.db.db import get_session
 
 
-BASE_URL = 'http://127.0.0.1' # todo
+BASE_URL = 'http://127.0.0.1'
 REDIS_URL = "redis://127.0.0.1:6379"
 TEST_DB_NAME = "db_tests"
-database_dsn = "postgresql+asyncpg://postgres:postgres@localhost:5432/db_tests" #todo
-#database_dsn = "postgresql+asyncpg://postgres:postgres@db:5432/db_tests"
+database_dsn = "postgresql+asyncpg://postgres:postgres@localhost:5432/db_tests"
+CACHE_KEY = 'PYTEST'
 
 
 async def _create_test_db() -> None:
@@ -52,8 +52,11 @@ async def async_session() -> AsyncGenerator:
         await conn.run_sync(Base.metadata.create_all)
 
     rc = RedisCacheBackend(REDIS_URL)
-    # TODO
     caches.set(CACHE_KEY, rc)
+
+    def get_cache_override():
+        return caches.get(CACHE_KEY)
+    app.dependency_overrides[redis_cache] = get_cache_override
 
     async with session() as s:
         def get_session_override():
@@ -77,17 +80,22 @@ async def client_authorized() -> AsyncGenerator:
     user, password = "user1", "psw"
     async with AsyncClient(app=app, follow_redirects=False,
                            base_url=BASE_URL) as async_client:
-        response = await async_client.post(app.url_path_for("user_register"), json={
-            'username': user,
-            'password': password
-        })
+        response = await async_client.post(
+            app.url_path_for("user_register"),
+            json={
+                'username': user,
+                'password': password
+            }
+        )
         assert response.status_code == HTTPStatus.CREATED
 
-        response = await async_client.post(app.url_path_for("user_auth"),
-                                     data={
-                                         'username': user,
-                                         'password': password,
-                                     })
+        response = await async_client.post(
+            app.url_path_for("user_auth"),
+            data={
+                'username': user,
+                'password': password,
+            }
+        )
         assert response.status_code == HTTPStatus.OK
         assert "access_token" in response.json()
         token = response.json()["access_token"]

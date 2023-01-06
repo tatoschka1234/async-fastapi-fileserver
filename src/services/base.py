@@ -2,28 +2,20 @@ import logging.config
 from pathlib import Path
 import uuid
 from time import perf_counter
-from typing import Any, Generic, Optional, Type, TypeVar
+from typing import Generic, Type, TypeVar
 from sqlalchemy import and_
 import aiofiles as aiofiles
-from fastapi import UploadFile, File, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, update
-from sqlalchemy import exc
-from passlib.context import CryptContext
 
 from src.db.db import Base
-from src.services.auth_utils import get_password_hash, verify_password
-from src.core.config import app_settings
-from src.schemas import users_schema
+from src.services.auth_utils import get_password_hash
 from src.core.logger import LOGGING
 logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
-
-
 
 
 class Repository:
@@ -47,12 +39,6 @@ ModelType = TypeVar("ModelType", bound=Base)
 UserCreateSchemaType = TypeVar("UserCreateSchemaType", bound=BaseModel)
 FileSchemaType = TypeVar("FileSchemaType", bound=BaseModel)
 UserType = TypeVar("UserType", bound=Base)
-FileListType = TypeVar("FileListType", bound=Base)
-# FullSchemaType = TypeVar("FullSchemaType", bound=BaseModel)
-# HealthModelType = TypeVar("HealthModelType", bound=Base)
-# ErrorModelType = TypeVar("ErrorModelType", bound=Base)
-# password_context = CryptContext(schemes=["bcrypt"],
-#                                              deprecated="auto")
 
 
 class RepositoryDBUsers(Repository, Generic[ModelType, UserCreateSchemaType]):
@@ -62,6 +48,7 @@ class RepositoryDBUsers(Repository, Generic[ModelType, UserCreateSchemaType]):
 
     async def user_register(self, db: AsyncSession,
                             obj_in: UserCreateSchemaType):
+        logger.info(f"Registering user {obj_in.username}")
         psw_hash = get_password_hash(obj_in.password)
         db_obj = self._model(**{"name": obj_in.username,
                               "psw_hash": psw_hash})
@@ -89,6 +76,7 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
             if self.is_dir_path(file_path):
                 file_path.mkdir(parents=True, exist_ok=True)
                 out_file_path = Path(file_path, upload_file.filename)
+                logger.debug(f"File path is directory")
             else:
                 out_file_path = file_path
 
@@ -104,7 +92,6 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
-        # return db_obj
 
     @staticmethod
     def is_valid_uuid(_uuid: str) -> uuid.UUID | None:
@@ -121,9 +108,10 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
             pass
 
     async def file_download(self, db: AsyncSession,
-                          file_id: str, user: UserType) -> File:
+                            file_id: str, user: UserType) -> File:
         use_uuid = self.is_valid_uuid(file_id)
         if use_uuid:
+            logger.debug(f"Download file by uuid")
             statement = select(self._model).where(
                 and_(
                     self._model.id == file_id,
@@ -131,6 +119,7 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
                 )
             )
         elif self.is_valid_path(file_id):
+            logger.debug(f"Download file by path")
             file_path = Path(file_id)
             statement = select(self._model).where(
                 and_(
@@ -139,12 +128,9 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
                     self._model.created_by == user.id
                 )
             )
-        try:
-            result = await db.scalar(statement=statement)
-            if result:
-                return FileResponse(Path(result.path, result.name))
-        except Exception as e:
-            return
+        result = await db.scalar(statement=statement)
+        if result:
+            return FileResponse(Path(result.path, result.name))
 
     async def health(self, db: AsyncSession) -> float:
         statement = select(self._model.name)
@@ -160,8 +146,8 @@ class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]
         return results.scalars().all()
 
     async def search(self, db: AsyncSession, user: UserType, path,
-                                         ext, order,
-                                         limit) -> list[FileSchemaType]:
+                     ext, order,
+                     limit) -> list[FileSchemaType]:
         statement = select(self._model).where(self._model.created_by == user.id)
         if path:
             statement = statement.where(self._model.path == path)

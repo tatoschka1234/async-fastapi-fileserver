@@ -66,4 +66,4 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
     user = await get_user(db, user_name=token_data.username)
     if user is None:
         raise credentials_exception
-    return user  # UserModel
+    return user
