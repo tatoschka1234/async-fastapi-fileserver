@@ -28,7 +28,7 @@ async def upload_file(
     user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_session),
     file: UploadFile = File(),
-    path: str = Query(example='/src/user_files/')
+    path: str = Query(example='/src/user_files/', max_length=500, min_length=1)
 ) -> None:
     """
     File upload.
@@ -47,7 +47,7 @@ async def upload_file(
     if cache_exists:
         await cache.delete(f'files_{user.id}')
 
-    keys = await get_key_by_key_pattern(cache, pattern=f'search-{user.id}*')
+    keys = await get_key_by_key_pattern(cache, pattern=f'search-user:{user.id}*')
     for key in keys:
         await cache.delete(key)
     await files_crud.file_upload(db=db, upload_file=file, path=path, user=user)
@@ -57,7 +57,8 @@ async def upload_file(
 async def get_file(
         *,
         user: UserModel = Depends(get_current_user),
-        file_id: str = Query(description='file uuid or path'),
+        file_id: str = Query(description='file uuid or path',
+                             max_length=500, min_length=1),
         db: AsyncSession = Depends(get_session),
 ) -> File:
     """
@@ -102,27 +103,33 @@ async def files_search(
         cache: RedisCacheBackend = Depends(redis_cache),
         user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(get_session),
-        path: str = '',
-        extension: str = '',
-        orderBy: str = Query(
+        path: str = Query(default='', max_length=500),
+        extension: str = Query(default='', max_length=10),
+        order_by: str = Query(
             default="name",
+            max_length=50,
             description=f"{', '.join(list(files_schema.FileBase.__fields__.keys()))}"),
-        limit: int = 0
+        limit: int = Query(
+            default=100,
+            ge=1,
+            alias='max-size',
+            description='Query max size.'
+        ),
 ) -> files_schema.FileSearchResult:
     """
     Search files
     """
-    if orderBy not in files_schema.FileBase.__fields__:
+    if order_by not in files_schema.FileBase.__fields__:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"orderBy should be in {files_schema.FileBase.__fields__}"
+            detail=f"order_by should be in {files_schema.FileBase.__fields__}"
         )
     cache_key = (f'search-user:{user.id}-path:{path}-ext:{extension}-'
-                 f'ord:{orderBy}-limit:{limit}')
+                 f'ord:{order_by}-limit:{limit}')
     result = await get_cache(cache, cache_key)
     if not result:
         result = await files_crud.search(db=db, user=user, path=path,
-                                         ext=extension, order=orderBy,
+                                         ext=extension, order=order_by,
                                          limit=limit)
         result = files_schema.FileSearchResult(matches=result)
         await set_cache(cache, redis_key=cache_key, data=result.dict())

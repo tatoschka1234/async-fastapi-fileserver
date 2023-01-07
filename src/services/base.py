@@ -1,6 +1,7 @@
 import logging.config
 from pathlib import Path
 import uuid
+from abc import ABC, abstractmethod
 from time import perf_counter
 from typing import Generic, Type, TypeVar
 from sqlalchemy import and_
@@ -18,20 +19,24 @@ logging.config.dictConfig(LOGGING)
 logger = logging.getLogger(__name__)
 
 
-class Repository:
-    def get(self, *args, **kwargs):
+class UserRepository(ABC):
+    @abstractmethod
+    def user_register(self, *args, **kwargs):
         raise NotImplementedError
 
-    def get_multi(self, *args, **kwargs):
+
+class FileRepository(ABC):
+    @abstractmethod
+    def file_upload(self, *args, **kwargs):
         raise NotImplementedError
 
-    def create(self, *args, **kwargs):
+    def file_download(self, *args, **kwargs):
         raise NotImplementedError
 
-    def update(self, *args, **kwargs):
+    def get_files_list(self, *args, **kwargs):
         raise NotImplementedError
 
-    def delete(self, *args, **kwargs):
+    def search(self, *args, **kwargs):
         raise NotImplementedError
 
 
@@ -41,7 +46,7 @@ FileSchemaType = TypeVar("FileSchemaType", bound=BaseModel)
 UserType = TypeVar("UserType", bound=Base)
 
 
-class RepositoryDBUsers(Repository, Generic[ModelType, UserCreateSchemaType]):
+class RepositoryDBUsers(UserRepository, Generic[ModelType, UserCreateSchemaType]):
 
     def __init__(self, model: Type[ModelType]):
         self._model = model
@@ -57,7 +62,7 @@ class RepositoryDBUsers(Repository, Generic[ModelType, UserCreateSchemaType]):
         await db.refresh(db_obj)
 
 
-class RepositoryDBFiles(Repository, Generic[ModelType, FileSchemaType, UserType]):
+class RepositoryDBFiles(FileRepository, Generic[ModelType, FileSchemaType, UserType]):
     def __init__(self, model: Type[ModelType], schema: Type[FileSchemaType]):
         self._model = model
         self._schema = schema

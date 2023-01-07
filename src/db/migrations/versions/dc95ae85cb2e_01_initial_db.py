@@ -1,8 +1,8 @@
 """01_initial-db
 
-Revision ID: d21363039746
+Revision ID: dc95ae85cb2e
 Revises: 
-Create Date: 2023-01-06 18:27:24.895660
+Create Date: 2023-01-07 20:30:53.851147
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'd21363039746'
+revision = 'dc95ae85cb2e'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -21,18 +21,18 @@ def upgrade() -> None:
     op.create_table('users',
     sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('name', sa.String(length=30), nullable=False),
-    sa.Column('psw_hash', sa.String(), nullable=False),
+    sa.Column('psw_hash', sa.String(length=300), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('files',
     sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
-    sa.Column('name', sa.String(), nullable=False),
-    sa.Column('path', sa.String(), nullable=False),
-    sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
+    sa.Column('name', sa.String(length=100), nullable=False),
+    sa.Column('path', sa.String(length=500), nullable=False),
+    sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.Column('is_downloadable', sa.Boolean(), nullable=True),
     sa.Column('size', sa.Integer(), nullable=True),
-    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###
