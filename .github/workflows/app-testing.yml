@@ -15,7 +15,32 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9", "3.10"]
+        python-version: ["3.10"]
+        db-name:
+          - postgres
+        db-psw:
+          - postgres
+        db-user:
+          - postgres
+        db-host:
+          - 127.0.0.1
+        db-port:
+          - 5432
+
+    services:
+      db:
+        image: postgres:14.5
+        env:
+          POSTGRES_USER: ${{ matrix.db-user }}
+          POSTGRES_PASSWORD: ${{ matrix.db-psw }}
+          POSTGRES_DB: ${{ matrix.db-name }}
+        ports:
+          - 5432:5432
+
+      cache:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -33,3 +58,6 @@ jobs:
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=119 --statistics --config=setup.cfg
+    - name: Pytest try
+      run: |
+        python -m pytest -m pytest tests/test_main.py::test_register
