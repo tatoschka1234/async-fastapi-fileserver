@@ -60,4 +60,4 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=119 --statistics --config=setup.cfg
     - name: Pytest try
       run: |
-        python -m pytest -m pytest tests/test_main.py::test_register
+        python -m pytest tests/test_main.py::test_register
