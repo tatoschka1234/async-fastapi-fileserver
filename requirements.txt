@@ -12,3 +12,4 @@ python-jose~=3.3.0
 python-multipart~=0.0.5
 fastapi-cache~=0.1.0
 orjson~=3.8.3
+pytest_asyncio~=0.20.3
